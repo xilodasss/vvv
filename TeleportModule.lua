@@ -1,9 +1,19 @@
-game:GetService("Players").LocalPlayer.PlayerGui.DraconicHubGui:Destroy()
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "Draconic Hub X Evade",
-    Text = "Welcome Draconic Hub Remake",
-    Duration = 7
-})
+local Players = game:GetService("Players")
+local StarterGui = game:GetService("StarterGui")
+local LocalPlayer = Players.LocalPlayer
+
+local existingGui = LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("DraconicHubGui")
+if existingGui then
+    existingGui:Destroy()
+end
+
+pcall(function()
+    StarterGui:SetCore("SendNotification", {
+        Title = "Draconic Hub X Evade",
+        Text = "Welcome Draconic Hub Remake",
+        Duration = 7
+    })
+end)
 local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
 local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
@@ -32,11 +42,9 @@ Fluent:Notify({
 })
 
 -- Services
-local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local VirtualUser = game:GetService("VirtualUser")
-local LocalPlayer = Players.LocalPlayer
 
 -- Billboard ESP Variables
 local NextbotBillboards = {}
@@ -2304,6 +2312,236 @@ AutoTicketFarmToggle:OnChanged(function(state)
         end
     end
 end)
+
+
+-- Teleport Tab (requested)
+local TeleportTab = Window:AddTab({ Title = "Teleport", Icon = "navigation" })
+TeleportTab:AddSection("Teleporter")
+
+local TeleportMapSpots = {
+    ["DesertBus"] = {
+        Far = CFrame.new(1350.6390380859375, -66.57595825195312, 913.889404296875, 0.08861260116100311, 0,
+            0.9960662126541138, 0, 1.0000001192092896, 0, -0.9960662126541138, 0, 0.08861260116100311),
+        Sky = CFrame.new(29.76473045349121, 69.4240493774414, -178.1037139892578, 0.6581460237503052, 0,
+            0.7528902888298035, 0, 1, 0, -0.752890408039093, 0, 0.6581459641456604)
+    },
+}
+
+local autoPlaceTeleporterEnabled = false
+local autoPlaceTeleporterType = "Far"
+local teleporterLoadProgress = 0
+local teleporterProcessingLoad = false
+
+local function getTeleportMapName()
+    local gameFolder = workspace:FindFirstChild("Game")
+    if not gameFolder then return "Unknown" end
+
+    local mapFolder = gameFolder:FindFirstChild("Map")
+    if not mapFolder then return "Unknown" end
+
+    local mapName = mapFolder:GetAttribute("MapName")
+    if mapName and mapName ~= "" then
+        return mapName
+    end
+
+    return "Unknown"
+end
+
+local function getLocalCharacterAndRoot()
+    local character = LocalPlayer.Character
+    if not character then
+        Fluent:Notify({ Title = "Teleport", Content = "Character not found!", Duration = 2 })
+        return nil, nil
+    end
+
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        Fluent:Notify({ Title = "Teleport", Content = "HumanoidRootPart not found!", Duration = 2 })
+        return nil, nil
+    end
+
+    return character, humanoidRootPart
+end
+
+local function safeTeleportToPosition(targetPosition)
+    local character, humanoidRootPart = getLocalCharacterAndRoot()
+    if not character or not humanoidRootPart then return false end
+
+    local teleportPosition = targetPosition + Vector3.new(0, 5, 0)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterDescendantsInstances = { character }
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+    local ray = workspace:Raycast(teleportPosition, Vector3.new(0, -10, 0), raycastParams)
+    if ray then
+        teleportPosition = ray.Position + Vector3.new(0, 3, 0)
+    end
+
+    humanoidRootPart.CFrame = CFrame.new(teleportPosition)
+    return true
+end
+
+local function placeTeleporterAt(cframe)
+    if not cframe then
+        Fluent:Notify({ Title = "Teleport", Content = "Invalid teleporter position", Duration = 2 })
+        return false
+    end
+
+    task.spawn(function()
+        local toolAction = ReplicatedStorage:WaitForChild("Events"):WaitForChild("Character"):WaitForChild("ToolAction")
+
+        pcall(function()
+            toolAction:FireServer(0, 16)
+            task.wait(1)
+            toolAction:FireServer(1, { "Teleporter", cframe })
+            task.wait(1)
+            toolAction:FireServer(0, 15)
+        end)
+
+        Fluent:Notify({ Title = "Teleport", Content = "Teleporter placed", Duration = 2 })
+    end)
+
+    return true
+end
+
+local function getMapSpot(spotType)
+    local mapName = getTeleportMapName()
+    local mapData = TeleportMapSpots[mapName]
+    if not mapData then
+        Fluent:Notify({ Title = "Teleport", Content = "Map '" .. mapName .. "' not in database", Duration = 3 })
+        return nil
+    end
+
+    local cframe = mapData[spotType]
+    if not cframe then
+        Fluent:Notify({ Title = "Teleport", Content = "Spot '" .. spotType .. "' not available", Duration = 3 })
+        return nil
+    end
+
+    return cframe
+end
+
+local function teleportPlayerToSpot(spotType)
+    local cframe = getMapSpot(spotType)
+    if not cframe then return false end
+    return safeTeleportToPosition(cframe.Position)
+end
+
+local function placeTeleporterToSpot(spotType)
+    local cframe = getMapSpot(spotType)
+    if not cframe then return false end
+    return placeTeleporterAt(cframe)
+end
+
+TeleportTab:AddToggle("AutoPlaceTeleporterToggle", {
+    Title = "Auto Place Every Round",
+    Description = "Auto place teleporter each round",
+    Default = false
+}):OnChanged(function(state)
+    autoPlaceTeleporterEnabled = state
+    if state then
+        Fluent:Notify({
+            Title = "Auto Place",
+            Content = "Enabled (" .. autoPlaceTeleporterType .. ")",
+            Duration = 2
+        })
+    end
+end)
+
+TeleportTab:AddDropdown("AutoPlaceTypeDropdown", {
+    Title = "Auto Place Type",
+    Values = { "Far", "Sky" },
+    Multi = false,
+    Default = "Far"
+}):OnChanged(function(value)
+    autoPlaceTeleporterType = value
+end)
+
+TeleportTab:AddButton({
+    Title = "Place Teleporter Far",
+    Callback = function()
+        placeTeleporterToSpot("Far")
+    end
+})
+
+TeleportTab:AddButton({
+    Title = "Place Teleporter Sky",
+    Callback = function()
+        placeTeleporterToSpot("Sky")
+    end
+})
+
+TeleportTab:AddButton({
+    Title = "Teleport Player To Far",
+    Callback = function()
+        teleportPlayerToSpot("Far")
+    end
+})
+
+TeleportTab:AddButton({
+    Title = "Teleport Player To Sky",
+    Callback = function()
+        teleportPlayerToSpot("Sky")
+    end
+})
+
+local gameFolderForTeleport = workspace:FindFirstChild("Game")
+local gameStatsForTeleport = gameFolderForTeleport and gameFolderForTeleport:FindFirstChild("Stats")
+
+if gameStatsForTeleport then
+    gameStatsForTeleport:GetAttributeChangedSignal("RoundStarted"):Connect(function()
+        if not autoPlaceTeleporterEnabled then return end
+
+        local roundStarted = gameStatsForTeleport:GetAttribute("RoundStarted")
+        local roundsCompleted = gameStatsForTeleport:GetAttribute("RoundsCompleted") or 0
+
+        if not roundStarted and roundsCompleted < 3 then
+            task.spawn(function()
+                task.wait(3)
+                local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                character:WaitForChild("HumanoidRootPart")
+                task.wait(1)
+                placeTeleporterToSpot(autoPlaceTeleporterType)
+            end)
+        end
+    end)
+
+    gameStatsForTeleport:GetAttributeChangedSignal("LoadProgress"):Connect(function()
+        if not autoPlaceTeleporterEnabled then return end
+        if teleporterProcessingLoad then return end
+
+        local loadProgress = gameStatsForTeleport:GetAttribute("LoadProgress") or 0
+        if teleporterLoadProgress == 0 and loadProgress > 1000 then
+            local currentMapName = getTeleportMapName()
+            if not TeleportMapSpots[currentMapName] then
+                teleporterLoadProgress = loadProgress
+                return
+            end
+
+            teleporterProcessingLoad = true
+            task.spawn(function()
+                local timer = nil
+                repeat
+                    task.wait(0.5)
+                    timer = gameStatsForTeleport:GetAttribute("Timer")
+                until timer and timer > 0
+
+                local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                character:WaitForChild("HumanoidRootPart")
+                task.wait(1)
+                placeTeleporterToSpot(autoPlaceTeleporterType)
+                task.wait(2)
+                teleporterProcessingLoad = false
+            end)
+        end
+
+        if loadProgress == 0 then
+            teleporterLoadProgress = 0
+        elseif loadProgress > 1000 then
+            teleporterLoadProgress = loadProgress
+        end
+    end)
+end
 
 CombatTab = Window:AddTab({ Title = "Combat", Icon = "swords" })
 
