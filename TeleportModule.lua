@@ -6,7 +6,7 @@
 local TeleportModule = {}
 
 -- ==================== MAP SPOTS DATABASE ====================
-local mapSpots = {
+TeleportModule.mapSpots = {  -- <-- PAKAI TeleportModule.mapSpots, BUKAN local
 	["DesertBus"] = {
 		Far = CFrame.new(1350.6390380859375, -66.57595825195312, 913.889404296875, 0.08861260116100311, 0, 0.9960662126541138, 0, 1.0000001192092896, 0, -0.9960662126541138, 0, 0.08861260116100311),
 		Sky = CFrame.new(29.76473045349121, 69.4240493774414, -178.1037139892578, 0.6581460237503052, 0, 0.7528902888298035, 0, 1, 0, -0.752890408039093, 0, 0.6581459641456604)
@@ -406,7 +406,7 @@ function TeleportModule.GetCurrentMap()
 end
 
 function TeleportModule.HasMapData(mapName)
-    return TeleportModule.mapSpots[mapName] ~= nil
+    return TeleportModule.mapSpots[mapName] ~= nil  -- <-- SEKARANG BENAR
 end
 
 function TeleportModule.GetMapSpot(mapName, spotType)
