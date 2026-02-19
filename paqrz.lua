@@ -1610,6 +1610,304 @@ local SmokeGrenadeModule = (function()
     }
 end)()
 
+
+-- -------------------------------------------------------------------------- --
+--                        9. MOVEMENT FEATURES MODULE                          --
+--                       Infinite Slide & Bunny Hop                            --
+-- -------------------------------------------------------------------------- --
+
+local MovementFeaturesModule = (function()
+    -- ==================== VARIABEL ====================
+    -- Infinite Slide
+    local infiniteSlideEnabled = false
+    local slideFrictionValue = -8
+    local movementTables = {}
+    local infiniteSlideHeartbeat = nil
+    local infiniteSlideCharacterConn = nil
+    
+    -- Bunny Hop
+    local bhopEnabled = false
+    local bhopMode = "Bounce"
+    local jumpCooldown = 0.7
+    local bhopConnection = nil
+    local lastJump = 0
+    local bhopHoldActive = false
+    
+    -- Constants
+    local GROUND_CHECK_OFFSET = 3.5
+    local GROUND_CHECK_RAY_LENGTH = 4
+    local MAX_SLOPE_ANGLE = 45
+    
+    -- Required keys
+    local requiredKeys = {
+        "Friction", "AirStrafeAcceleration", "JumpHeight", "RunDeaccel",
+        "JumpSpeedMultiplier", "JumpCap", "SprintCap", "WalkSpeedMultiplier",
+        "BhopEnabled", "Speed", "AirAcceleration", "RunAccel", "SprintAcceleration"
+    }
+    
+    -- ==================== INFINITE SLIDE FUNCTIONS ====================
+    
+    local function hasRequiredFields(tbl)
+        if typeof(tbl) ~= "table" then return false end
+        for _, key in ipairs(requiredKeys) do
+            if rawget(tbl, key) == nil then return false end
+        end
+        return true
+    end
+    
+    local function findMovementTables()
+        movementTables = {}
+        for _, obj in ipairs(getgc(true)) do
+            if hasRequiredFields(obj) then
+                table.insert(movementTables, obj)
+            end
+        end
+        return #movementTables > 0
+    end
+    
+    local function setSlideFriction(value)
+        local appliedCount = 0
+        for _, tbl in ipairs(movementTables) do
+            pcall(function()
+                tbl.Friction = value
+                appliedCount = appliedCount + 1
+            end)
+        end
+        return appliedCount
+    end
+    
+    local function getPlayerModel()
+        local gameFolder = workspace:FindFirstChild("Game")
+        if not gameFolder then return nil end
+        local playersFolder = gameFolder:FindFirstChild("Players")
+        if not playersFolder then return nil end
+        return playersFolder:FindFirstChild(player.Name)
+    end
+    
+    local function infiniteSlideHeartbeatFunc()
+        if not infiniteSlideEnabled then return end
+        local playerModel = getPlayerModel()
+        if not playerModel then return end
+        local state = playerModel:GetAttribute("State")
+        
+        if state == "Slide" then
+            pcall(function()
+                playerModel:SetAttribute("State", "EmotingSlide")
+            end)
+        elseif state == "EmotingSlide" then
+            setSlideFriction(slideFrictionValue)
+        else
+            setSlideFriction(5)
+        end
+    end
+    
+    local function onCharacterAddedSlide(character)
+        if not infiniteSlideEnabled then return end
+        for i = 1, 5 do
+            task.wait(0.5)
+            if getPlayerModel() then break end
+        end
+        task.wait(0.5)
+        findMovementTables()
+    end
+    
+    local function toggleInfiniteSlide(state)
+        infiniteSlideEnabled = state
+        
+        if state then
+            findMovementTables()
+            if not infiniteSlideCharacterConn then
+                infiniteSlideCharacterConn = player.CharacterAdded:Connect(onCharacterAddedSlide)
+            end
+            if player.Character then
+                task.spawn(function() onCharacterAddedSlide(player.Character) end)
+            end
+            if infiniteSlideHeartbeat then infiniteSlideHeartbeat:Disconnect() end
+            infiniteSlideHeartbeat = RunService.Heartbeat:Connect(infiniteSlideHeartbeatFunc)
+            Success("Infinite Slide", "Activated (Speed: " .. slideFrictionValue .. ")", 2)
+        else
+            if infiniteSlideHeartbeat then
+                infiniteSlideHeartbeat:Disconnect()
+                infiniteSlideHeartbeat = nil
+            end
+            setSlideFriction(5)
+            movementTables = {}
+            Info("Infinite Slide", "Deactivated", 2)
+        end
+        return infiniteSlideEnabled
+    end
+    
+    local function setSlideSpeed(value)
+        local num = tonumber(value)
+        if num then
+            slideFrictionValue = num
+            if infiniteSlideEnabled then
+                setSlideFriction(slideFrictionValue)
+                Success("Slide Speed", "Set to: " .. num, 1)
+            end
+            return true
+        end
+        return false
+    end
+    
+    -- ==================== BUNNY HOP FUNCTIONS ====================
+    
+    local function IsOnGround(character, humanoid, rootPart)
+        if not character or not humanoid or not rootPart then return false end
+        local state = humanoid:GetState()
+        if state == Enum.HumanoidStateType.Jumping or 
+           state == Enum.HumanoidStateType.Freefall or
+           state == Enum.HumanoidStateType.Swimming then
+            return false
+        end
+        if humanoid:GetState() == Enum.HumanoidStateType.Running then
+            return true
+        end
+        
+        local rayOrigin = rootPart.Position
+        local rayDirection = Vector3.new(0, -GROUND_CHECK_RAY_LENGTH, 0)
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.FilterDescendantsInstances = {character}
+        raycastParams.IgnoreWater = true
+        local raycastResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+        
+        if raycastResult then
+            local surfaceNormal = raycastResult.Normal
+            local angle = math.deg(math.acos(surfaceNormal:Dot(Vector3.new(0, 1, 0))))
+            if angle <= MAX_SLOPE_ANGLE then
+                local heightDiff = math.abs(rayOrigin.Y - raycastResult.Position.Y)
+                return heightDiff <= GROUND_CHECK_OFFSET
+            end
+        end
+        if rootPart.Velocity.Y > -1 and rootPart.Velocity.Y < 1 then
+            return true
+        end
+        return false
+    end
+    
+    local function updateBhop()
+        if not bhopEnabled and not bhopHoldActive then return end
+        local character = player.Character
+        if not character then return end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not rootPart then return end
+        if humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
+        
+        local now = tick()
+        if IsOnGround(character, humanoid, rootPart) and (now - lastJump) > jumpCooldown then
+            if bhopMode == "Realistic" then
+                pcall(function()
+                    player.PlayerScripts.Events.temporary_events.JumpReact:Fire()
+                    task.wait(0.05)
+                    player.PlayerScripts.Events.temporary_events.EndJump:Fire()
+                end)
+            else
+                humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+            end
+            lastJump = now
+        end
+    end
+    
+    local function toggleBhop(state)
+        bhopEnabled = state
+        if state or bhopHoldActive then
+            if not bhopConnection then
+                bhopConnection = RunService.Heartbeat:Connect(updateBhop)
+                Success("Bunny Hop", "Activated (Mode: " .. bhopMode .. ")", 2)
+            end
+        else
+            if bhopConnection and not bhopHoldActive then
+                bhopConnection:Disconnect()
+                bhopConnection = nil
+                Info("Bunny Hop", "Deactivated", 2)
+            end
+        end
+        return bhopEnabled
+    end
+    
+    local function setBhopMode(mode)
+        bhopMode = mode
+        if bhopEnabled then
+            Success("Bhop Mode", "Set to: " .. mode, 1)
+        end
+        return true
+    end
+    
+    local function setJumpCooldown(value)
+        local num = tonumber(value)
+        if num and num > 0 then
+            jumpCooldown = num
+            if bhopEnabled then
+                Success("Jump Cooldown", "Set to: " .. num .. "s", 1)
+            end
+            return true
+        end
+        return false
+    end
+    
+    local function setBhopHoldActive(active)
+        bhopHoldActive = active
+        toggleBhop(bhopEnabled)
+    end
+    
+    -- ==================== SETUP ====================
+    
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.Space then
+            setBhopHoldActive(true)
+        end
+    end)
+    
+    UserInputService.InputEnded:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.Space then
+            setBhopHoldActive(false)
+        end
+    end)
+    
+    player.CharacterAdded:Connect(function(character)
+        onCharacterAddedSlide(character)
+        if bhopEnabled or bhopHoldActive then
+            task.wait(1)
+            lastJump = 0
+        end
+    end)
+    
+    player.CharacterRemoving:Connect(function()
+        lastJump = 0
+    end)
+    
+    Players.PlayerRemoving:Connect(function(leavingPlayer)
+        if leavingPlayer == player then
+            if infiniteSlideHeartbeat then infiniteSlideHeartbeat:Disconnect() end
+            if infiniteSlideCharacterConn then infiniteSlideCharacterConn:Disconnect() end
+            if bhopConnection then bhopConnection:Disconnect() end
+        end
+    end)
+    
+    task.spawn(function()
+        task.wait(2)
+        findMovementTables()
+    end)
+    
+    -- ==================== PUBLIC API ====================
+    return {
+        ToggleInfiniteSlide = toggleInfiniteSlide,
+        SetSlideSpeed = setSlideSpeed,
+        IsInfiniteSlideEnabled = function() return infiniteSlideEnabled end,
+        GetSlideSpeed = function() return slideFrictionValue end,
+        
+        ToggleBhop = toggleBhop,
+        SetBhopMode = setBhopMode,
+        SetJumpCooldown = setJumpCooldown,
+        IsBhopEnabled = function() return bhopEnabled end,
+        GetBhopMode = function() return bhopMode end,
+        GetJumpCooldown = function() return jumpCooldown end,
+    }
+end)()
+
 -- -------------------------------------------------------------------------- --
 --                         FLY MODULE                                         --
 -- -------------------------------------------------------------------------- --
@@ -2162,6 +2460,339 @@ local VisualFeaturesModule = (function()
     }
 end)()
 
+-- -------------------------------------------------------------------------- --
+--                         LAG SWITCH MODULE                                   --
+-- -------------------------------------------------------------------------- --
+
+local LagSwitchModule = (function()
+    -- ==================== VARIABEL ====================
+    local enabled = false
+    local mode = "Normal" -- "Normal" atau "Demon"
+    local delay = 0.1
+    local intensity = 1000000
+    local demonHeight = 10
+    local demonSpeed = 80
+    local keybind = "F12"
+    local isActive = false
+    local buttonGui = nil
+    
+    -- ==================== NORMAL MODE ====================
+    local function performNormalLag()
+        local startTime = tick()
+        local duration = delay
+        
+        while tick() - startTime < duration do
+            for i = 1, intensity do
+                local a = math.random(1, 1000000) * math.random(1, 1000000)
+                a = a / math.random(1, 10000)
+                local b = math.sqrt(math.random(1, 1000000))
+                b = b * math.pi * math.exp(1)
+            end
+        end
+    end
+    
+    -- ==================== DEMON MODE ====================
+    local function performDemonLag()
+        local startTime = tick()
+        local duration = delay
+        
+        -- Part 1: Math lag
+        task.spawn(function()
+            local startLag = tick()
+            while tick() - startLag < duration do
+                for i = 1, math.floor(intensity / 2) do
+                    local a = math.random(1, 1000000) * math.random(1, 1000000)
+                    a = a / math.random(1, 10000)
+                end
+            end
+        end)
+        
+        -- Part 2: Player rise
+        local character = player.Character
+        if character then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            local humanoid = character:FindFirstChild("Humanoid")
+            
+            if rootPart and humanoid then
+                local startHeight = rootPart.Position.Y
+                
+                -- BodyThrust untuk naik
+                local bodyThrust = Instance.new("BodyThrust")
+                bodyThrust.Force = Vector3.new(0, demonSpeed * 500, 0)
+                bodyThrust.Location = Vector3.new(0, 0, 0)
+                bodyThrust.Parent = rootPart
+                
+                -- BodyVelocity untuk kontrol
+                local bodyVelocity = Instance.new("BodyVelocity")
+                bodyVelocity.MaxForce = Vector3.new(0, 500000, 0)
+                bodyVelocity.Velocity = Vector3.new(0, demonSpeed, 0)
+                bodyVelocity.Parent = rootPart
+                
+                -- Tunggu sampai mencapai ketinggian
+                local waitTime = 0
+                local maxWait = 5
+                
+                while waitTime < maxWait do
+                    local currentHeight = rootPart.Position.Y
+                    if currentHeight - startHeight >= demonHeight then
+                        break
+                    end
+                    task.wait(0.1)
+                    waitTime = waitTime + 0.1
+                end
+                
+                -- Bersihkan force
+                pcall(function() bodyThrust:Destroy() end)
+                pcall(function() bodyVelocity:Destroy() end)
+                
+                local finalHeight = rootPart.Position.Y
+                Success("Demon Mode", string.format("Naik %.1f meter", finalHeight - startHeight), 2)
+            end
+        end
+        
+        isActive = false
+    end
+    
+    -- ==================== FUNGSI UTAMA ====================
+    local function toggle()
+        if not enabled then 
+            Warning("Lag Switch", "Aktifkan toggle terlebih dahulu", 2)
+            return 
+        end
+        if isActive then return end
+        
+        isActive = true
+        
+        if mode == "Normal" then
+            task.spawn(function()
+                performNormalLag()
+                isActive = false
+            end)
+            Success("Lag Switch", "Normal mode triggered", 1)
+        else
+            task.spawn(function()
+                performDemonLag()
+                isActive = false
+            end)
+            Success("Lag Switch", "Demon mode triggered", 1)
+        end
+    end
+    
+    -- ==================== FUNGSI UPDATE BUTTON ====================
+    local function updateButtonDisplay()
+        if not buttonGui then return end
+        
+        local frame = buttonGui:FindFirstChild("Frame")
+        if not frame then return end
+        
+        -- Update mode label
+        for _, child in pairs(frame:GetChildren()) do
+            if child:IsA("TextLabel") and child.Text:find("Mode:") then
+                child.Text = "Mode: " .. mode
+                child.TextColor3 = mode == "Normal" and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(200, 100, 100)
+            end
+            
+            -- Update button text
+            if child:IsA("TextButton") then
+                child.Text = "TRIGGER (" .. keybind .. ")"
+            end
+        end
+    end
+    
+    -- ==================== SETTERS ====================
+    local function setEnabled(state)
+        enabled = state
+        if state then
+            Info("Lag Switch", "Enabled", 1)
+        else
+            Info("Lag Switch", "Disabled", 1)
+        end
+        updateButtonDisplay()
+    end
+    
+    local function setMode(newMode)
+        mode = newMode
+        Info("Lag Switch", "Mode: " .. newMode, 1)
+        updateButtonDisplay()
+    end
+    
+    local function setDelay(value)
+        local num = tonumber(value)
+        if num and num > 0 and num <= 5 then
+            delay = num
+            Info("Lag Switch", "Delay: " .. delay .. "s", 1)
+        end
+    end
+    
+    local function setIntensity(value)
+        local num = tonumber(value)
+        if num and num >= 1000 and num <= 10000000 then
+            intensity = num
+        end
+    end
+    
+    local function setDemonHeight(value)
+        local num = tonumber(value)
+        if num and num >= 10 and num <= 500 then
+            demonHeight = num
+        end
+    end
+    
+    local function setDemonSpeed(value)
+        local num = tonumber(value)
+        if num and num >= 20 and num <= 200 then
+            demonSpeed = num
+        end
+    end
+    
+    local function setKeybind(newKey)
+        keybind = newKey
+        Info("Lag Switch", "Keybind: " .. newKey, 1)
+        updateButtonDisplay()
+    end
+    
+    -- ==================== GUI BUTTON ====================
+    local function createButton()
+        if buttonGui then
+            pcall(function() buttonGui:Destroy() end)
+        end
+        
+        local CoreGui = game:GetService("CoreGui")
+        buttonGui = Instance.new("ScreenGui")
+        buttonGui.Name = "LagSwitchButton"
+        buttonGui.ResetOnSpawn = false
+        buttonGui.Parent = CoreGui
+        
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 200, 0, 60)
+        frame.Position = UDim2.new(0.5, -100, 0.5, 0)
+        frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+        frame.BackgroundTransparency = 0.2
+        frame.BorderSizePixel = 0
+        frame.Active = true
+        frame.Draggable = true
+        frame.Parent = buttonGui
+        
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 8)
+        corner.Parent = frame
+        
+        -- Status text
+        local statusLabel = Instance.new("TextLabel")
+        statusLabel.Size = UDim2.new(1, -10, 0, 20)
+        statusLabel.Position = UDim2.new(0, 5, 0, 5)
+        statusLabel.BackgroundTransparency = 1
+        statusLabel.Text = "⚡ LAG SWITCH"
+        statusLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        statusLabel.TextSize = 12
+        statusLabel.Font = Enum.Font.GothamBold
+        statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+        statusLabel.Parent = frame
+        
+        -- Mode indicator
+        local modeLabel = Instance.new("TextLabel")
+        modeLabel.Size = UDim2.new(1, -10, 0, 20)
+        modeLabel.Position = UDim2.new(0, 5, 0, 25)
+        modeLabel.BackgroundTransparency = 1
+        modeLabel.Text = "Mode: " .. mode
+        modeLabel.TextColor3 = mode == "Normal" and Color3.fromRGB(100, 200, 100) or Color3.fromRGB(200, 100, 100)
+        modeLabel.TextSize = 10
+        modeLabel.Font = Enum.Font.Gotham
+        modeLabel.TextXAlignment = Enum.TextXAlignment.Left
+        modeLabel.Parent = frame
+        
+        -- Trigger button
+        local triggerBtn = Instance.new("TextButton")
+        triggerBtn.Size = UDim2.new(1, -10, 0, 30)
+        triggerBtn.Position = UDim2.new(0, 5, 0, 45)
+        triggerBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        triggerBtn.Text = "TRIGGER (" .. keybind .. ")"
+        triggerBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        triggerBtn.TextSize = 14
+        triggerBtn.Font = Enum.Font.GothamBold
+        triggerBtn.Parent = frame
+        
+        local btnCorner = Instance.new("UICorner")
+        btnCorner.CornerRadius = UDim.new(0, 4)
+        btnCorner.Parent = triggerBtn
+        
+        -- Hover effect
+        triggerBtn.MouseEnter:Connect(function()
+            triggerBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+        end)
+        
+        triggerBtn.MouseLeave:Connect(function()
+            triggerBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+        end)
+        
+        triggerBtn.MouseButton1Click:Connect(function()
+            if enabled then
+                toggle()
+                -- Flash effect
+                triggerBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+                task.wait(0.1)
+                triggerBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+            else
+                Warning("Lag Switch", "Enable toggle first", 1)
+            end
+        end)
+        
+        return buttonGui
+    end
+    
+    local function destroyButton()
+        if buttonGui then
+            pcall(function() buttonGui:Destroy() end)
+            buttonGui = nil
+        end
+    end
+    
+    -- ==================== KEYBIND ====================
+    UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode[keybind] then
+            if enabled then
+                toggle()
+            end
+        end
+    end)
+    
+    -- ==================== GET STATUS ====================
+    local function getStatus()
+        return string.format(
+            "Enabled: %s\nMode: %s\nDelay: %.1fs\nIntensity: %d\nKey: %s",
+            enabled and "✅" or "❌",
+            mode,
+            delay,
+            intensity,
+            keybind
+        )
+    end
+    
+    -- ==================== PUBLIC API ====================
+    return {
+        -- Main
+        toggle = toggle,
+        setEnabled = setEnabled,
+        setMode = setMode,
+        isEnabled = function() return enabled end,
+        
+        -- Settings
+        setDelay = setDelay,
+        setIntensity = setIntensity,
+        setDemonHeight = setDemonHeight,
+        setDemonSpeed = setDemonSpeed,
+        setKeybind = setKeybind,
+        
+        -- GUI
+        createButton = createButton,
+        destroyButton = destroyButton,
+        
+        -- Status
+        getStatus = getStatus,
+    }
+end)()
+
 -- ========================================================================== --
 --                              LOAD WINDUI                                    --
 -- ========================================================================== --
@@ -2213,12 +2844,16 @@ Tabs.Customise = Window:Section({
 local CredTab = Tabs.Imp:Tab({ Title = "Credits", Icon = "newspaper" })
 local UpadTab = Tabs.Imp:Tab({ Title = "Update Log", Icon = "scroll-text" })
 
+-- Main Section Tabs
 local AutoTab = Tabs.Main:Tab({ Title = "Auto", Icon = "zap" })
 local TeleportTab = Tabs.Main:Tab({ Title = "Teleport", Icon = "navigation" })
 local VisualTab = Tabs.Main:Tab({ Title = "Visual", Icon = "eye" })
+-- 👇 TAMBAHKAN INI DI SINI (setelah VisualTab, sebelum MiscTab)
+local MovementTab = Tabs.Main:Tab({ Title = "Movement", Icon = "activity" })
 local MiscTab = Tabs.Main:Tab({ Title = "Misc", Icon = "package" })
 local ServerTab = Tabs.Main:Tab({ Title = "Server", Icon = "server" })
 
+-- Appearance Section Tabs
 local SettingsTab = Tabs.Customise:Tab({ Title = "Settings", Icon = "settings" })
 local WindowConfigTab = Tabs.Customise:Tab({ Title = "Window Config", Icon = "settings" })
 
@@ -2896,44 +3531,124 @@ VisualTab:Button({
 })
 
 -- ========================================================================== --
---                              MISC TAB                                      --
+--                              MOVEMENT TAB                                   --
+--                    Noclip | Bug Emote | Fly | Slide | Bhop                  --
 -- ========================================================================== --
 
-MiscTab:Section({ Title = "Movement Features", TextSize = 18 })
-MiscTab:Divider()
+-- ==================== MOVEMENT FEATURES ====================
+MovementTab:Section({ Title = "Movement Features", TextSize = 20 })
+MovementTab:Divider()
 
-MiscTab:Toggle({
+-- Noclip Toggle
+MovementTab:Toggle({
     Title = "Noclip",
     Desc = "Walk through walls and objects",
     Value = false,
     Callback = function(state)
-        if state then
-            NoclipModule.Start()
-        else
-            NoclipModule.Stop()
-        end
+        if state then NoclipModule.Start() else NoclipModule.Stop() end
     end
 })
 
-MiscTab:Toggle({
+-- Bug Emote Toggle
+MovementTab:Toggle({
     Title = "Bug Emote",
     Desc = "Force your character to sit",
     Value = false,
     Callback = function(state)
-        if state then
-            BugEmoteModule.Start()
-        else
-            BugEmoteModule.Stop()
-        end
+        if state then BugEmoteModule.Start() else BugEmoteModule.Stop() end
     end
 })
 
-MiscTab:Space()
-MiscTab:Divider()
-MiscTab:Section({ Title = "Fly System", TextSize = 18 })
-MiscTab:Divider()
+MovementTab:Space()
+MovementTab:Divider()
 
-MiscTab:Toggle({
+-- ==================== INFINITE SLIDE ====================
+MovementTab:Section({ Title = "Infinite Slide", TextSize = 20 })
+MovementTab:Divider()
+
+-- Infinite Slide Toggle
+MovementTab:Toggle({
+    Title = "Infinite Slide",
+    Desc = "Slide tanpa batas (hold Shift saat lari)",
+    Value = false,
+    Callback = function(state)
+        MovementFeaturesModule.ToggleInfiniteSlide(state)
+    end
+})
+
+-- Slide Speed Input
+MovementTab:Input({
+    Title = "Slide Speed",
+    Desc = "Nilai negatif = akselerasi (contoh: -8)",
+    Placeholder = "Masukkan nilai",
+    Value = "-8",
+    Callback = function(value)
+        MovementFeaturesModule.SetSlideSpeed(value)
+    end
+})
+
+-- Info Slide
+MovementTab:Paragraph({
+    Title = "Cara Pakai Slide",
+    Desc = "• Berlari (hold Shift)\n• Slide akan terus tanpa batas\n• Atur speed untuk akselerasi",
+    ThumbnailSize = 0
+})
+
+MovementTab:Space()
+MovementTab:Divider()
+
+-- ==================== BUNNY HOP ====================
+MovementTab:Section({ Title = "Bunny Hop", TextSize = 20 })
+MovementTab:Divider()
+
+-- Bhop Toggle
+MovementTab:Toggle({
+    Title = "Bunny Hop",
+    Desc = "Lompat otomatis saat berlari",
+    Value = false,
+    Callback = function(state)
+        MovementFeaturesModule.ToggleBhop(state)
+    end
+})
+
+-- Bhop Mode Dropdown
+MovementTab:Dropdown({
+    Title = "Bhop Mode",
+    Desc = "Pilih mode lompat",
+    Values = { "Bounce", "Realistic" },
+    Value = "Bounce",
+    Callback = function(value)
+        MovementFeaturesModule.SetBhopMode(value)
+    end
+})
+
+-- Jump Cooldown Input
+MovementTab:Input({
+    Title = "Jump Cooldown",
+    Desc = "Jeda antar lompatan (detik)",
+    Placeholder = "Contoh: 0.7",
+    Value = "0.7",
+    Callback = function(value)
+        MovementFeaturesModule.SetJumpCooldown(value)
+    end
+})
+
+-- Info Bhop
+MovementTab:Paragraph({
+    Title = "Cara Pakai Bhop",
+    Desc = "• Aktifkan toggle\n• Berlari (hold Shift)\n• Hold Space untuk temporary Bhop\n• Mode Bounce = cepat, Realistic = mirip human",
+    ThumbnailSize = 0
+})
+
+MovementTab:Space()
+MovementTab:Divider()
+
+-- ==================== FLY SYSTEM ====================
+MovementTab:Section({ Title = "Fly System", TextSize = 20 })
+MovementTab:Divider()
+
+-- Fly Toggle
+MovementTab:Toggle({
     Title = "Activate Fly",
     Desc = "Enable/disable flying mode (WASD + Space/Shift)",
     Value = false,
@@ -2942,7 +3657,8 @@ MiscTab:Toggle({
     end
 })
 
-MiscTab:Input({
+-- Fly Speed Input
+MovementTab:Input({
     Title = "Fly Speed",
     Desc = "Set flying speed (10-500)",
     Placeholder = "Enter speed",
@@ -2955,7 +3671,8 @@ MiscTab:Input({
     end
 })
 
-MiscTab:Button({
+-- Reset Fly Button
+MovementTab:Button({
     Title = "Reset Fly",
     Desc = "Force stop fly if stuck",
     Callback = function()
@@ -2964,17 +3681,21 @@ MiscTab:Button({
     end
 })
 
-MiscTab:Paragraph({
+-- Fly Controls Info
+MovementTab:Paragraph({
     Title = "Fly Controls",
     Desc = "W/A/S/D = Move\nSpace = Fly Up\nShift = Fly Down\nCamera = Direction",
     ThumbnailSize = 0
 })
 
-MiscTab:Space()
-MiscTab:Divider()
+-- ========================================================================== --
+--                              MISC TAB (RINGAN)                              --
+-- ========================================================================== --
+
 MiscTab:Section({ Title = "Weapon Enhancements", TextSize = 18 })
 MiscTab:Divider()
 
+-- Grapplehook Button
 MiscTab:Button({
     Title = "Grapplehook",
     Desc = "Enhance Grapplehook (infinite ammo, speed)",
@@ -2983,6 +3704,7 @@ MiscTab:Button({
     end
 })
 
+-- Breacher Button
 MiscTab:Button({
     Title = "Breacher (Portal Gun)",
     Desc = "Enhance Breacher (infinite range, no cooldown)",
@@ -2991,6 +3713,7 @@ MiscTab:Button({
     end
 })
 
+-- Smoke Grenade Button
 MiscTab:Button({
     Title = "Smoke Grenade",
     Desc = "Enhance Smoke Grenade (bigger cloud, faster)",
@@ -2999,11 +3722,95 @@ MiscTab:Button({
     end
 })
 
-MiscTab:Space()
+MiscTab:Divider()
+MiscTab:Section({ Title = "Lag Switch", TextSize = 18 })
+MiscTab:Divider()
+
+-- Toggle utama
+MiscTab:Toggle({
+    Title = "Enable Lag Switch",
+    Desc = "Aktifkan fitur lag switch",
+    Value = false,
+    Callback = function(state)
+        LagSwitchModule.setEnabled(state)
+    end
+})
+
+-- Mode dropdown
+MiscTab:Dropdown({
+    Title = "Mode",
+    Desc = "Normal = lag biasa | Demon = lag + naik",
+    Values = { "Normal", "Demon" },
+    Value = "Normal",
+    Callback = function(value)
+        LagSwitchModule.setMode(value)
+    end
+})
+
+-- Delay
+MiscTab:Input({
+    Title = "Delay (seconds)",
+    Desc = "Durasi lag (0.1 - 5 detik)",
+    Placeholder = "Contoh: 0.1",
+    Value = "0.1",
+    Callback = function(value)
+        LagSwitchModule.setDelay(value)
+    end
+})
+
+-- Intensity
+MiscTab:Input({
+    Title = "Intensity",
+    Desc = "Kekuatan lag (1000 - 10.000.000)",
+    Placeholder = "Contoh: 1000000",
+    Value = "1000000",
+    Callback = function(value)
+        LagSwitchModule.setIntensity(value)
+    end
+})
+
+-- Demon Height
+MiscTab:Input({
+    Title = "Demon Height (m)",
+    Desc = "Tinggi naik (10-500m)",
+    Placeholder = "Contoh: 10",
+    Value = "10",
+    Callback = function(value)
+        LagSwitchModule.setDemonHeight(value)
+    end
+})
+
+-- Demon Speed
+MiscTab:Input({
+    Title = "Demon Speed",
+    Desc = "Kecepatan naik (20-200)",
+    Placeholder = "Contoh: 80",
+    Value = "80",
+    Callback = function(value)
+        LagSwitchModule.setDemonSpeed(value)
+    end
+})
+
+-- Keybind (SATU-SATUNYA CARA TRIGGER)
+MiscTab:Keybind({
+    Title = "Trigger Key",
+    Desc = "Tekan untuk trigger lag",
+    Value = "F12",
+    Callback = function()
+        if LagSwitchModule.isEnabled() then
+            LagSwitchModule.toggle()
+        end
+    end,
+    ChangedCallback = function(new)
+        LagSwitchModule.setKeybind(new)
+    end
+})
+
 MiscTab:Divider()
 MiscTab:Section({ Title = "UI Features", TextSize = 18 })
 MiscTab:Divider()
 
+-- Unlock Leaderboard Button
 MiscTab:Button({
     Title = "Unlock Leaderboard/Zoom/Front View",
     Desc = "Click to create custom buttons",
@@ -3332,6 +4139,7 @@ player.CharacterAdded:Connect(function(character)
     RemoveBarriersModule.OnCharacterAdded()
     BarriersVisibleModule.OnCharacterAdded()
     FlyModule.OnCharacterAdded()
+    -- Movement Features Module sudah punya connection internal
 end)
 
 -- ========================================================================== --
@@ -3339,4 +4147,5 @@ end)
 -- ========================================================================== --
 
 Window:SelectTab(1)
-Success("LightningWare V2", "Evade script loaded successfully with ERROR HANDLING!", 3)
+Success("LightningWare V2", "Evade script loaded successfully with " .. 
+       "Auto | Teleport | Visual | Movement | Misc | Server", 3)
