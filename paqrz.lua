@@ -1454,7 +1454,7 @@ local GrapplehookModule = (function()
             shootMethod.Info.Lifetime = 10.0
             shootMethod.Info.Gravity = Vector3.new(0, 0, 0)
             shootMethod.Info.SpreadIncrease = 0
-            shootMethod.Info.Cooldown = 0.1
+            shootMethod.Info.Cooldown = 0.3
 
             grappleTask.MethodReferences.Projectile.Info.SpreadInfo.MaxSpread = 0
             grappleTask.MethodReferences.Projectile.Info.SpreadInfo.MinSpread = 0
@@ -1462,12 +1462,12 @@ local GrapplehookModule = (function()
 
             local checkMethod = grappleTask.AutomaticFunctions[1].Methods[1]
             if checkMethod then
-                checkMethod.Info.Cooldown = 0.1
-                checkMethod.CooldownInfo.TestCooldown = 0.1
+                checkMethod.Info.Cooldown = 0.3
+                checkMethod.CooldownInfo.TestCooldown = 0.3
             end
 
-            grappleTask.ResourceInfo.Cap = 999999
-            grappleTask.ResourceInfo.Reserve = 999999
+            grappleTask.ResourceInfo.Cap = 999
+            grappleTask.ResourceInfo.Reserve = 999
 
             return true
         end)
@@ -1511,7 +1511,7 @@ local BreacherModule = (function()
                 portalTask = Breacher.Tasks[2]
             end
 
-            portalTask.ResourceInfo.Cap = 999999
+            portalTask.ResourceInfo.Cap = 999
 
             local blueShoot = portalTask.Functions[1].Activations[1].Methods[1]
             local yellowShoot = portalTask.Functions[2].Activations[1].Methods[1]
@@ -1526,8 +1526,8 @@ local BreacherModule = (function()
             portalTask.MethodReferences.Portal.Info.SpreadInfo.MinSpread = 0
             portalTask.MethodReferences.Portal.Info.SpreadInfo.ReductionRate = 100
 
-            blueShoot.Info.Cooldown = 0.1
-            yellowShoot.Info.Cooldown = 0.1
+            blueShoot.Info.Cooldown = 0.4
+            yellowShoot.Info.Cooldown = 0.4
 
             blueShoot.CooldownInfo = {}
             yellowShoot.CooldownInfo = {}
@@ -1574,7 +1574,7 @@ local SmokeGrenadeModule = (function()
             local throwMethod = SmokeGrenade.Tasks[1].Functions[1].Activations[1].Methods[1]
 
             throwMethod.ItemUseIncrement = {"SmokeGrenade", 0}
-            throwMethod.Info.Cooldown = 0.05
+            throwMethod.Info.Cooldown = 0.5
             throwMethod.Info.ThrowVelocity = 200
 
             SmokeGrenade.Tasks[1].Functions[1].Activations[1].CanHoldDown = true
@@ -1585,8 +1585,8 @@ local SmokeGrenadeModule = (function()
 
             local equipMethod = SmokeGrenade.Tasks[1].AutomaticFunctions[1].Methods[1]
             local unequipMethod = SmokeGrenade.Tasks[1].AutomaticFunctions[2].Methods[1]
-            equipMethod.Info.Cooldown = 0.1
-            unequipMethod.Info.Cooldown = 0.1
+            equipMethod.Info.Cooldown = 0.5
+            unequipMethod.Info.Cooldown = 0.5
 
             throwMethod.CooldownInfo = {}
 
