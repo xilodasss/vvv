@@ -1420,15 +1420,6 @@ local BarriersVisibleModule = (function()
     }
 end)()
 
--- 5. UNLOCK LEADERBOARD MODULE
-local UnlockLeaderboardModule = (function()
-    return {
-        Execute = function()
-            Success("Info", "Feature coming soon!", 2)
-            warn("UnlockLeaderboardModule is temporarily disabled")
-        end
-    }
-end)()
 
 -- 6. GRAPPLEHOOK MODULE (DENGAN ERROR HANDLING)
 local GrapplehookModule = (function()
@@ -1454,7 +1445,7 @@ local GrapplehookModule = (function()
             shootMethod.Info.Lifetime = 10.0
             shootMethod.Info.Gravity = Vector3.new(0, 0, 0)
             shootMethod.Info.SpreadIncrease = 0
-            shootMethod.Info.Cooldown = 0.3
+            shootMethod.Info.Cooldown = 0.1
 
             grappleTask.MethodReferences.Projectile.Info.SpreadInfo.MaxSpread = 0
             grappleTask.MethodReferences.Projectile.Info.SpreadInfo.MinSpread = 0
@@ -1462,12 +1453,12 @@ local GrapplehookModule = (function()
 
             local checkMethod = grappleTask.AutomaticFunctions[1].Methods[1]
             if checkMethod then
-                checkMethod.Info.Cooldown = 0.3
-                checkMethod.CooldownInfo.TestCooldown = 0.3
+                checkMethod.Info.Cooldown = 0.1
+                checkMethod.CooldownInfo.TestCooldown = 0.1
             end
 
-            grappleTask.ResourceInfo.Cap = 999
-            grappleTask.ResourceInfo.Reserve = 999
+            grappleTask.ResourceInfo.Cap = 999999
+            grappleTask.ResourceInfo.Reserve = 999999
 
             return true
         end)
@@ -1511,7 +1502,7 @@ local BreacherModule = (function()
                 portalTask = Breacher.Tasks[2]
             end
 
-            portalTask.ResourceInfo.Cap = 999
+            portalTask.ResourceInfo.Cap = 999999
 
             local blueShoot = portalTask.Functions[1].Activations[1].Methods[1]
             local yellowShoot = portalTask.Functions[2].Activations[1].Methods[1]
@@ -1526,8 +1517,8 @@ local BreacherModule = (function()
             portalTask.MethodReferences.Portal.Info.SpreadInfo.MinSpread = 0
             portalTask.MethodReferences.Portal.Info.SpreadInfo.ReductionRate = 100
 
-            blueShoot.Info.Cooldown = 0.4
-            yellowShoot.Info.Cooldown = 0.4
+            blueShoot.Info.Cooldown = 0.1
+            yellowShoot.Info.Cooldown = 0.1
 
             blueShoot.CooldownInfo = {}
             yellowShoot.CooldownInfo = {}
@@ -1574,7 +1565,7 @@ local SmokeGrenadeModule = (function()
             local throwMethod = SmokeGrenade.Tasks[1].Functions[1].Activations[1].Methods[1]
 
             throwMethod.ItemUseIncrement = {"SmokeGrenade", 0}
-            throwMethod.Info.Cooldown = 0.5
+            throwMethod.Info.Cooldown = 0.05
             throwMethod.Info.ThrowVelocity = 200
 
             SmokeGrenade.Tasks[1].Functions[1].Activations[1].CanHoldDown = true
@@ -1585,8 +1576,8 @@ local SmokeGrenadeModule = (function()
 
             local equipMethod = SmokeGrenade.Tasks[1].AutomaticFunctions[1].Methods[1]
             local unequipMethod = SmokeGrenade.Tasks[1].AutomaticFunctions[2].Methods[1]
-            equipMethod.Info.Cooldown = 0.5
-            unequipMethod.Info.Cooldown = 0.5
+            equipMethod.Info.Cooldown = 0.1
+            unequipMethod.Info.Cooldown = 0.1
 
             throwMethod.CooldownInfo = {}
 
@@ -1815,13 +1806,11 @@ local MovementFeaturesModule = (function()
         if state or bhopHoldActive then
             if not bhopConnection then
                 bhopConnection = RunService.Heartbeat:Connect(updateBhop)
-                Success("Bunny Hop", "Activated (Mode: " .. bhopMode .. ")", 2)
             end
         else
             if bhopConnection and not bhopHoldActive then
                 bhopConnection:Disconnect()
                 bhopConnection = nil
-                Info("Bunny Hop", "Deactivated", 2)
             end
         end
         return bhopEnabled
@@ -1830,7 +1819,6 @@ local MovementFeaturesModule = (function()
     local function setBhopMode(mode)
         bhopMode = mode
         if bhopEnabled then
-            Success("Bhop Mode", "Set to: " .. mode, 1)
         end
         return true
     end
@@ -1840,7 +1828,6 @@ local MovementFeaturesModule = (function()
         if num and num > 0 then
             jumpCooldown = num
             if bhopEnabled then
-                Success("Jump Cooldown", "Set to: " .. num .. "s", 1)
             end
             return true
         end
@@ -1905,6 +1892,218 @@ local MovementFeaturesModule = (function()
         IsBhopEnabled = function() return bhopEnabled end,
         GetBhopMode = function() return bhopMode end,
         GetJumpCooldown = function() return jumpCooldown end,
+    }
+end)()
+
+-- -------------------------------------------------------------------------- --
+--                        10. UNLOCK LEADERBOARD MODULE                        --
+--                         (Front View & Leaderboard Only)                     --
+--                              (Layout di Kiri)                                --
+-- -------------------------------------------------------------------------- --
+
+local UnlockLeaderboardModule = (function()
+    local buttonGui = nil
+    local player = game:GetService("Players").LocalPlayer
+    local TweenService = game:GetService("TweenService")
+    local StarterGui = game:GetService("StarterGui")
+    
+    local function createLeaderboardUI()
+        -- Hapus GUI lama jika ada
+        if buttonGui and buttonGui.Parent then
+            pcall(function() buttonGui:Destroy() end)
+        end
+        
+        local playerGui = player:WaitForChild("PlayerGui")
+        
+        -- Cek apakah sudah ada
+        local existing = playerGui:FindFirstChild("CustomTopGui")
+        if existing then
+            existing:Destroy()
+        end
+        
+        -- Nonaktifkan topbar bawaan
+        pcall(function()
+            StarterGui:SetCore("TopbarEnabled", false)
+        end)
+        
+        -- Buat ScreenGui utama
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "CustomTopGui"
+        screenGui.IgnoreGuiInset = false
+        screenGui.ScreenInsets = Enum.ScreenInsets.TopbarSafeInsets
+        screenGui.DisplayOrder = 100
+        screenGui.ResetOnSpawn = false
+        screenGui.Parent = playerGui
+        buttonGui = screenGui
+        
+        -- Container untuk button (di kiri)
+        local container = Instance.new("Frame")
+        container.Name = "ButtonContainer"
+        container.Parent = screenGui
+        container.BackgroundTransparency = 1
+        container.Size = UDim2.new(1, -20, 1, 0)
+        container.Position = UDim2.new(0, 10, 0, 10)
+        
+        -- Layout horizontal dengan alignment kiri
+        local layout = Instance.new("UIListLayout")
+        layout.Parent = container
+        layout.FillDirection = Enum.FillDirection.Horizontal
+        layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+        layout.VerticalAlignment = Enum.VerticalAlignment.Top
+        layout.Padding = UDim.new(0, 8)
+        
+        -- Konfigurasi button (hanya 2)
+        local buttonsConfig = {
+            {
+                name = "FrontViewButton",
+                icon = "rbxassetid://78648212535999",
+                label = "Front View",
+                keys = {"Reload", "FrontView", "View"},
+                color = Color3.fromRGB(45, 45, 45)
+            },
+            {
+                name = "LeaderboardButton",
+                icon = "rbxassetid://5107166345",
+                label = "Leaderboard",
+                keys = {"Leaderboard", "Scoreboard"},
+                color = Color3.fromRGB(45, 45, 45)
+            }
+        }
+        
+        -- Fungsi untuk trigger keybind
+        local function triggerKey(key, state)
+            pcall(function()
+                local useKeybind = player.PlayerScripts.Events.temporary_events.UseKeybind
+                if useKeybind then
+                    useKeybind:Fire({Key = key, Down = state})
+                end
+            end)
+        end
+        
+        -- Buat button
+        for _, config in ipairs(buttonsConfig) do
+            -- Frame button utama
+            local btnFrame = Instance.new("Frame")
+            btnFrame.Name = config.name
+            btnFrame.Parent = container
+            btnFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+            btnFrame.BackgroundTransparency = 0.3
+            btnFrame.BorderSizePixel = 0
+            btnFrame.Size = UDim2.new(0, 44, 0, 44)
+            btnFrame.ZIndex = 10
+            
+            -- Sudut bulat
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(1, 0)
+            corner.Parent = btnFrame
+            
+            -- Icon
+            local icon = Instance.new("ImageLabel")
+            icon.Name = "Icon"
+            icon.Parent = btnFrame
+            icon.BackgroundTransparency = 1
+            icon.Size = UDim2.new(0.7, 0, 0.7, 0)
+            icon.Position = UDim2.new(0.15, 0, 0.15, 0)
+            icon.Image = config.icon
+            icon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+            icon.ZIndex = 11
+            
+            -- Tombol klik
+            local clickBtn = Instance.new("TextButton")
+            clickBtn.Name = "ClickButton"
+            clickBtn.Parent = btnFrame
+            clickBtn.BackgroundTransparency = 1
+            clickBtn.Size = UDim2.new(1, 0, 1, 0)
+            clickBtn.ZIndex = 20
+            clickBtn.Text = ""
+            clickBtn.AutoButtonColor = false
+            
+            -- Label yang muncul saat hover
+            local label = Instance.new("TextLabel")
+            label.Name = "Label"
+            label.Parent = btnFrame
+            label.BackgroundTransparency = 1
+            label.Position = UDim2.new(0, 0, 1, 5)
+            label.Size = UDim2.new(1, 0, 0, 16)
+            label.Font = Enum.Font.GothamBold
+            label.Text = config.label
+            label.TextColor3 = Color3.fromRGB(255, 255, 255)
+            label.TextSize = 12
+            label.TextStrokeTransparency = 0.5
+            label.ZIndex = 12
+            label.Visible = false
+            
+            -- Hover effect
+            clickBtn.MouseEnter:Connect(function()
+                btnFrame.BackgroundTransparency = 0
+                label.Visible = true
+            end)
+            
+            clickBtn.MouseLeave:Connect(function()
+                btnFrame.BackgroundTransparency = 0.3
+                label.Visible = false
+            end)
+            
+            -- Klik handler
+            clickBtn.MouseButton1Down:Connect(function()
+                btnFrame.BackgroundTransparency = 0.5
+                for _, key in ipairs(config.keys) do
+                    triggerKey(key, true)
+                end
+            end)
+            
+            clickBtn.MouseButton1Up:Connect(function()
+                btnFrame.BackgroundTransparency = 0
+                for _, key in ipairs(config.keys) do
+                    triggerKey(key, false)
+                end
+            end)
+            
+            clickBtn.MouseLeave:Connect(function()
+                btnFrame.BackgroundTransparency = 0.3
+                label.Visible = false
+                for _, key in ipairs(config.keys) do
+                    triggerKey(key, false)
+                end
+            end)
+        end
+        
+        return screenGui
+    end
+    
+    local function destroyLeaderboardUI()
+        if buttonGui and buttonGui.Parent then
+            pcall(function() buttonGui:Destroy() end)
+            buttonGui = nil
+        end
+        
+        -- Kembalikan topbar bawaan
+        pcall(function()
+            StarterGui:SetCore("TopbarEnabled", true)
+        end)
+    end
+    
+    return {
+        Create = function()
+            local success, err = pcall(createLeaderboardUI)
+            if success then
+                Success("Leaderboard", "Custom UI created!", 2)
+                return true
+            else
+                Error("Leaderboard", "Failed: " .. tostring(err), 3)
+                return false
+            end
+        end,
+        Destroy = destroyLeaderboardUI,
+        Toggle = function()
+            if buttonGui and buttonGui.Parent then
+                destroyLeaderboardUI()
+                Info("Leaderboard", "Custom UI destroyed", 2)
+            else
+                createLeaderboardUI()
+                Success("Leaderboard", "Custom UI created!", 2)
+            end
+        end
     }
 end)()
 
@@ -3237,42 +3436,82 @@ TeleportTab:Divider()
 local selectedPlayerName = nil
 local PlayerListDropdown = nil
 
+-- Fungsi refresh yang SUPER AMAN
 local function refreshPlayerDropdown()
-    if PlayerListDropdown then
-        local playerList = TeleportFeaturesModule.GetPlayerList()
+    -- Cek dropdown ada
+    if not PlayerListDropdown then return end
+    
+    -- Ambil player list dengan aman
+    local playerList = {}
+    local success, result = pcall(TeleportFeaturesModule.GetPlayerList)
+    if success and result and type(result) == "table" then
+        playerList = result
+    end
+    
+    -- Validasi
+    if #playerList == 0 then
+        playerList = { "No players available" }
+    end
+    
+    -- Refresh dengan pcall terpisah
+    local refreshSuccess = pcall(function()
         PlayerListDropdown:Refresh(playerList)
-        if playerList[1] and playerList[1] ~= "No players available" then
-            if not selectedPlayerName or not table.find(playerList, selectedPlayerName) then
-                selectedPlayerName = playerList[1]
+    end)
+    
+    if not refreshSuccess then
+        warn("Dropdown refresh failed - ignoring")
+        return
+    end
+    
+    -- Update selected player
+    if playerList[1] and playerList[1] ~= "No players available" then
+        if not selectedPlayerName or not table.find(playerList, selectedPlayerName) then
+            selectedPlayerName = playerList[1]
+            pcall(function()
                 PlayerListDropdown:Select(selectedPlayerName)
-            end
-        else
-            selectedPlayerName = nil
+            end)
         end
+    else
+        selectedPlayerName = nil
     end
 end
 
-PlayerListDropdown = TeleportTab:Dropdown({
-    Title = "Select Player",
-    Values = TeleportFeaturesModule.GetPlayerList(),
-    SearchBarEnabled = true,
-    Value = TeleportFeaturesModule.GetPlayerList()[1] or "No players available",
-    Callback = function(value)
-        if value ~= "No players available" then
-            selectedPlayerName = value
+-- Buat dropdown dengan error handling
+local dropdownSuccess, dropdownResult = pcall(function()
+    return TeleportTab:Dropdown({
+        Title = "Select Player",
+        Values = { "Loading..." },  -- Sementara pakai loading
+        SearchBarEnabled = true,
+        Value = "Loading...",
+        Callback = function(value)
+            if value and value ~= "No players available" and value ~= "Loading..." then
+                selectedPlayerName = value
+            end
         end
-    end
-})
+    })
+end)
 
--- Auto refresh player list
+if dropdownSuccess then
+    PlayerListDropdown = dropdownResult
+    -- Refresh setelah dropdown jadi
+    task.spawn(function()
+        task.wait(0.5)
+        pcall(refreshPlayerDropdown)
+    end)
+else
+    warn("Failed to create dropdown")
+    PlayerListDropdown = { Refresh = function() end, Select = function() end }
+end
+
+-- Auto refresh dengan delay lebih lama
 Players.PlayerAdded:Connect(function()
-    task.wait(0.5)
-    refreshPlayerDropdown()
+    task.wait(1.5)  -- Delay lebih lama
+    pcall(refreshPlayerDropdown)
 end)
 
 Players.PlayerRemoving:Connect(function()
-    task.wait(0.1)
-    refreshPlayerDropdown()
+    task.wait(1)
+    pcall(refreshPlayerDropdown)
 end)
 
 -- Teleport to Selected Player
@@ -3282,7 +3521,9 @@ TeleportTab:Button({
     Variant = "Primary",
     Callback = function()
         if selectedPlayerName and selectedPlayerName ~= "No players available" then
-            TeleportFeaturesModule.TeleportToPlayer(selectedPlayerName)
+            pcall(function()
+                TeleportFeaturesModule.TeleportToPlayer(selectedPlayerName)
+            end)
         else
             Error("Teleport", "Pilih player terlebih dahulu!", 2)
         end
@@ -3295,7 +3536,7 @@ TeleportTab:Button({
     Desc = "Update daftar player manual",
     Variant = "Secondary",
     Callback = function()
-        refreshPlayerDropdown()
+        pcall(refreshPlayerDropdown)
         Info("Player List", "Daftar player diupdate!", 2)
     end
 })
@@ -3305,11 +3546,10 @@ TeleportTab:Button({
     Title = "Teleport to Random Player",
     Desc = "Teleport ke player random",
     Callback = function()
-        TeleportFeaturesModule.TeleportToRandomPlayer()
+        pcall(TeleportFeaturesModule.TeleportToRandomPlayer)
     end
 })
 
-TeleportTab:Divider()
 
 -- ==================== DOWNED PLAYER TELEPORTS ====================
 TeleportTab:Section({ Title = "Downed Player Teleports", TextSize = 20 })
@@ -3341,6 +3581,24 @@ VisualTab:Toggle({
         else
             RemoveBarriersModule.Stop()
         end
+    end
+})
+
+-- ========== TARUH KEYBIND DI SINI ==========
+VisualTab:Keybind({
+    Title = "Remove Barriers Keybind",
+    Desc = "Tekan untuk toggle Remove Barriers",
+    Value = "B",  -- Default key B
+    Callback = function()
+        -- Toggle tanpa notifikasi
+        if RemoveBarriersModule.IsEnabled() then
+            RemoveBarriersModule.Stop()
+        else
+            RemoveBarriersModule.Start()
+        end
+    end,
+    ChangedCallback = function(newKey)
+        Success("Keybind", "Remove Barriers keybind: " .. newKey, 1)
     end
 })
 
@@ -3505,6 +3763,58 @@ VisualTab:Button({
     Callback = function()
         VisualFeaturesModule.AntiLag3()
     end
+})
+
+-- ==================== FIELD OF VIEW (FOV) ====================
+VisualTab:Space()
+VisualTab:Divider()
+VisualTab:Section({ Title = "Field of View (FOV)", TextSize = 18 })
+VisualTab:Divider()
+
+-- Variable untuk mencegah callback pertama
+local firstTime = true
+
+-- FOV Dropdown
+local fovDropdown = VisualTab:Dropdown({
+    Title = "FOV Presets",
+    Desc = "Pilih FOV (langsung work)",
+    Values = { "100 FOV", "110 FOV", "120 FOV", "130 FOV", "140 FOV", "150 FOV" },
+    Value = "100 FOV",
+    Callback = function(value)
+        -- SKIP callback pertama saat inisialisasi
+        if firstTime then
+            firstTime = false
+            return
+        end
+        
+        local inputValue = 150
+        
+        if value == "100 FOV" then
+            inputValue = 150
+        elseif value == "110 FOV" then
+            inputValue = 200
+        elseif value == "120 FOV" then
+            inputValue = 250
+        elseif value == "130 FOV" then
+            inputValue = 300
+        elseif value == "140 FOV" then
+            inputValue = 350
+        elseif value == "150 FOV" then
+            inputValue = 400
+        end
+        
+        -- Apply FOV
+        game:GetService("ReplicatedStorage").Events.Data.ChangeSetting:InvokeServer(2, inputValue)
+        
+        Success("FOV", "Changed to " .. value, 2)
+    end
+})
+
+-- Info
+VisualTab:Paragraph({
+    Title = "⚠️ PENTING!",
+    Desc = "• FOV hanya berubah saat DIPILIH\n• Execute ulang script TIDAK mengubah FOV\n• WAJIB REJOIN agar stabil",
+    ThumbnailSize = 0
 })
 
 VisualTab:Space()
@@ -3806,16 +4116,41 @@ MiscTab:Keybind({
     end
 })
 
+
+
 MiscTab:Divider()
 MiscTab:Section({ Title = "UI Features", TextSize = 18 })
 MiscTab:Divider()
 
 -- Unlock Leaderboard Button
 MiscTab:Button({
-    Title = "Unlock Leaderboard/Zoom/Front View",
-    Desc = "Click to create custom buttons",
+    Title = "Unlock Leaderboard",
+    Desc = "Buat custom button untuk Zoom, Front View, dan Leaderboard",
     Callback = function()
-        UnlockLeaderboardModule.Execute()
+        UnlockLeaderboardModule.Create()
+    end
+})
+
+-- Destroy Leaderboard Button (opsional)
+MiscTab:Button({
+    Title = "Remove Leaderboard UI",
+    Desc = "Hapus custom button dan kembalikan topbar normal",
+    Callback = function()
+        UnlockLeaderboardModule.Destroy()
+    end
+})
+
+-- Toggle Leaderboard (alternatif)
+MiscTab:Toggle({
+    Title = "Toggle Leaderboard UI",
+    Desc = "Aktifkan/nonaktifkan custom button",
+    Value = false,
+    Callback = function(state)
+        if state then
+            UnlockLeaderboardModule.Create()
+        else
+            UnlockLeaderboardModule.Destroy()
+        end
     end
 })
 
