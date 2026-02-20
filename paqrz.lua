@@ -3601,7 +3601,7 @@ VisualTab:Keybind({
     end
 })
 
-V-- ========== TAMBAHKAN KEYBIND BARRIERS VISIBLE DI SINI ==========
+-- ========== TAMBAHKAN KEYBIND BARRIERS VISIBLE DI SINI ==========
 VisualTab:Keybind({
     Title = "Barriers Visible Keybind",
     Desc = "Tekan untuk toggle Barriers Visible",
