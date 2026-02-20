@@ -1453,12 +1453,12 @@ local GrapplehookModule = (function()
 
             local checkMethod = grappleTask.AutomaticFunctions[1].Methods[1]
             if checkMethod then
-                checkMethod.Info.Cooldown = 0.4
-                checkMethod.CooldownInfo.TestCooldown = 0.4
+                checkMethod.Info.Cooldown = 0.1
+                checkMethod.CooldownInfo.TestCooldown = 0.1
             end
 
-            grappleTask.ResourceInfo.Cap = 999
-            grappleTask.ResourceInfo.Reserve = 999
+            grappleTask.ResourceInfo.Cap = 999999
+            grappleTask.ResourceInfo.Reserve = 999999
 
             return true
         end)
@@ -1502,7 +1502,7 @@ local BreacherModule = (function()
                 portalTask = Breacher.Tasks[2]
             end
 
-            portalTask.ResourceInfo.Cap = 999
+            portalTask.ResourceInfo.Cap = 999999
 
             local blueShoot = portalTask.Functions[1].Activations[1].Methods[1]
             local yellowShoot = portalTask.Functions[2].Activations[1].Methods[1]
@@ -1517,8 +1517,8 @@ local BreacherModule = (function()
             portalTask.MethodReferences.Portal.Info.SpreadInfo.MinSpread = 0
             portalTask.MethodReferences.Portal.Info.SpreadInfo.ReductionRate = 100
 
-            blueShoot.Info.Cooldown = 0.4
-            yellowShoot.Info.Cooldown = 0.4
+            blueShoot.Info.Cooldown = 0.1
+            yellowShoot.Info.Cooldown = 0.1
 
             blueShoot.CooldownInfo = {}
             yellowShoot.CooldownInfo = {}
@@ -1565,7 +1565,7 @@ local SmokeGrenadeModule = (function()
             local throwMethod = SmokeGrenade.Tasks[1].Functions[1].Activations[1].Methods[1]
 
             throwMethod.ItemUseIncrement = {"SmokeGrenade", 0}
-            throwMethod.Info.Cooldown = 0.2
+            throwMethod.Info.Cooldown = 0.05
             throwMethod.Info.ThrowVelocity = 200
 
             SmokeGrenade.Tasks[1].Functions[1].Activations[1].CanHoldDown = true
@@ -1576,8 +1576,8 @@ local SmokeGrenadeModule = (function()
 
             local equipMethod = SmokeGrenade.Tasks[1].AutomaticFunctions[1].Methods[1]
             local unequipMethod = SmokeGrenade.Tasks[1].AutomaticFunctions[2].Methods[1]
-            equipMethod.Info.Cooldown = 0.2
-            unequipMethod.Info.Cooldown = 0.2
+            equipMethod.Info.Cooldown = 0.1
+            unequipMethod.Info.Cooldown = 0.1
 
             throwMethod.CooldownInfo = {}
 
@@ -3588,7 +3588,6 @@ VisualTab:Toggle({
 VisualTab:Keybind({
     Title = "Remove Barriers Keybind",
     Desc = "Tekan untuk toggle Remove Barriers",
-    Value = "B",  -- Default key B
     Callback = function()
         -- Toggle tanpa notifikasi
         if RemoveBarriersModule.IsEnabled() then
@@ -3602,6 +3601,24 @@ VisualTab:Keybind({
     end
 })
 
+V-- ========== TAMBAHKAN KEYBIND BARRIERS VISIBLE DI SINI ==========
+VisualTab:Keybind({
+    Title = "Barriers Visible Keybind",
+    Desc = "Tekan untuk toggle Barriers Visible",
+    Callback = function()
+        if BarriersVisibleModule.IsEnabled() then
+            BarriersVisibleModule.Stop()
+        else
+            BarriersVisibleModule.Start()
+        end
+    end,
+    ChangedCallback = function(newKey)
+        Success("Keybind", "Barriers Visible keybind: " .. newKey, 1)
+    end
+})
+-- =================================================================
+
+-- Barriers Visible Toggle
 VisualTab:Toggle({
     Title = "Barriers Visible",
     Desc = "Make invisible barriers visible with color",
