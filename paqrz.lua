@@ -4122,7 +4122,6 @@ MiscTab:Input({
 MiscTab:Keybind({
     Title = "Trigger Key",
     Desc = "Tekan untuk trigger lag",
-    Value = "F12",
     Callback = function()
         if LagSwitchModule.isEnabled() then
             LagSwitchModule.toggle()
