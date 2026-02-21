@@ -4481,6 +4481,105 @@ local ToggleTransparency = WindowConfigTab:Toggle({
 })
 
 -- ========================================================================== --
+--                      SIMPLE INFO DISPLAY (POJOK KANAN BAWAH)               --
+-- ========================================================================== --
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+
+-- Nonaktifkan topbar agar tidak ganggu
+StarterGui:SetCore("TopbarEnabled", false)
+
+-- Buat ScreenGui sederhana
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SimpleInfoDisplay"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.DisplayOrder = 1000
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- Frame utama (transparan)
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Parent = screenGui
+mainFrame.BackgroundTransparency = 1
+mainFrame.Size = UDim2.new(0, 200, 0, 80)
+mainFrame.Position = UDim2.new(1, -210, 0, 10)  -- Pojok kanan atas
+mainFrame.ZIndex = 10
+
+-- TextLabel untuk informasi
+local infoLabel = Instance.new("TextLabel")
+infoLabel.Name = "InfoLabel"
+infoLabel.Parent = mainFrame
+infoLabel.Size = UDim2.new(1, 0, 1, 0)
+infoLabel.BackgroundTransparency = 1
+infoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+infoLabel.TextStrokeTransparency = 0.5
+infoLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+infoLabel.Font = Enum.Font.GothamBold
+infoLabel.TextSize = 14
+infoLabel.TextXAlignment = Enum.TextXAlignment.Right
+infoLabel.TextYAlignment = Enum.TextYAlignment.Bottom
+infoLabel.Text = ""
+infoLabel.ZIndex = 11
+
+-- Variabel untuk session time
+local startTime = os.time()
+local frameCount = 0
+local lastFPSUpdate = tick()
+local currentFPS = 0
+local fpsUpdateInterval = 0.5
+
+-- Update setiap frame
+RunService.RenderStepped:Connect(function()
+    frameCount = frameCount + 1
+    
+    -- Update FPS setiap interval
+    local currentTime = tick()
+    if currentTime - lastFPSUpdate >= fpsUpdateInterval then
+        currentFPS = math.floor(frameCount / (currentTime - lastFPSUpdate))
+        frameCount = 0
+        lastFPSUpdate = currentTime
+    end
+    
+    -- Hitung session time
+    local elapsed = os.time() - startTime
+    local hours = math.floor(elapsed / 3600)
+    local minutes = math.floor((elapsed % 3600) / 60)
+    local seconds = elapsed % 60
+    
+    -- Ambil timer game dari Stats
+    local timerText = "0:00"
+    local gameStats = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Stats")
+    if gameStats then
+        local timerValue = gameStats:GetAttribute("TimerRound")
+        if timerValue then
+            local mins = math.floor(timerValue / 60)
+            local secs = timerValue % 60
+            timerText = string.format("%d:%02d", mins, secs)
+        end
+    end
+    
+    -- Format teks
+    local sessionText = string.format("%02d:%02d:%02d", hours, minutes, seconds)
+    
+    infoLabel.Text = string.format(
+        "FPS: %d\nTimer: %s\nSession: %s",
+        currentFPS,
+        timerText,
+        sessionText
+    )
+end)
+
+-- Auto hide/show saat respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(0.5)
+    screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end)
+
+-- ========================================================================== --
 --                              CHARACTER CONNECTIONS                          --
 -- ========================================================================== --
 
@@ -4490,7 +4589,6 @@ player.CharacterAdded:Connect(function(character)
     RemoveBarriersModule.OnCharacterAdded()
     BarriersVisibleModule.OnCharacterAdded()
     FlyModule.OnCharacterAdded()
-    -- Movement Features Module sudah punya connection internal
 end)
 
 -- ========================================================================== --
