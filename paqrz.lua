@@ -4554,7 +4554,7 @@ RunService.RenderStepped:Connect(function()
     local timerText = "0:00"
     local gameStats = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Stats")
     if gameStats then
-        local timerValue = gameStats:GetAttribute("TimerRound")
+        local timerValue = gameStats:GetAttribute("Timer")
         if timerValue then
             local mins = math.floor(timerValue / 60)
             local secs = timerValue % 60
