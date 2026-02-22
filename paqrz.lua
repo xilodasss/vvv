@@ -3004,12 +3004,12 @@ WindUI:SetTheme("Violet")
 -- ========================================================================== --
 
 local Window = WindUI:CreateWindow({
-    Title = "LightningWare V2 - Evade",
+    Title = "rzprivate - Evade",
     Icon = "sparkles",
     IconThemed = true,
     Size = UDim2.fromOffset(650, 500),
     Background = "rbxassetid://85878831310179",
-    Folder = "LightningWare",
+    Folder = "rzprivate",
 })
 
 -- ========================================================================== --
@@ -3062,7 +3062,7 @@ local WindowConfigTab = Tabs.Customise:Tab({ Title = "Window Config", Icon = "se
 
 CredTab:Paragraph({
     Title = "Credits",
-    Desc = "Original Script: BagahHub\nAdapted to: LightningWare V2\nGUI Library: WindUI\nVisual Features: Draconic Style",
+    Desc = "Original rzprivate \nGUI Library: WindUI\nVisual by: iruz",
     Thumbnail = "https://wallpapers.com/images/high/widescreen-darling-in-the-franxx-02-uzmizm4y7lhahvy1.webp",
     ThumbnailSize = 150
 })
@@ -3100,7 +3100,6 @@ CredTab:Paragraph({
 UpadTab:Paragraph({
     Title = "Update Log v2.0",
     Desc = [[
-• Migrated to LightningWare V2 UI
 • Added Auto Self Revive with methods
 • Added Fast Revive with methods
 • Added Teleport features (13+ features)
@@ -3138,7 +3137,7 @@ UpadTab:Paragraph({
 
 UpadTab:Paragraph({
     Title = "Original Features",
-    Desc = "• All BagahHub Evade features preserved",
+    Desc = "• All Evade features preserved",
 })
 
 -- ========================================================================== --
@@ -4452,7 +4451,7 @@ WindowConfigTab:Dropdown({
         "85878831310179",
         "easter egg ig >:3"
     },
-    Default = "85878831310179",
+    Default = "easter egg ig >:3",
     Callback = function(option)
         if option:match("^%d+$") then
             Window:SetBackgroundImage("rbxassetid://" .. option)
@@ -4525,8 +4524,7 @@ infoLabel.TextYAlignment = Enum.TextYAlignment.Bottom
 infoLabel.Text = ""
 infoLabel.ZIndex = 11
 
--- Variabel untuk session time
-local startTime = os.time()
+-- Variabel untuk FPS (session time dihapus)
 local frameCount = 0
 local lastFPSUpdate = tick()
 local currentFPS = 0
@@ -4544,12 +4542,6 @@ RunService.RenderStepped:Connect(function()
         lastFPSUpdate = currentTime
     end
     
-    -- Hitung session time
-    local elapsed = os.time() - startTime
-    local hours = math.floor(elapsed / 3600)
-    local minutes = math.floor((elapsed % 3600) / 60)
-    local seconds = elapsed % 60
-    
     -- Ambil timer game dari Stats
     local timerText = "0:00"
     local gameStats = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Stats")
@@ -4562,14 +4554,11 @@ RunService.RenderStepped:Connect(function()
         end
     end
     
-    -- Format teks
-    local sessionText = string.format("%02d:%02d:%02d", hours, minutes, seconds)
-    
+    -- Format teks (session dihapus)
     infoLabel.Text = string.format(
-        "FPS: %d\nTimer: %s\nSession: %s",
+        "FPS: %d\nTimer: %s",
         currentFPS,
-        timerText,
-        sessionText
+        timerText
     )
 end)
 
@@ -4596,5 +4585,5 @@ end)
 -- ========================================================================== --
 
 Window:SelectTab(1)
-Success("LightningWare V2", "Evade script loaded successfully with " .. 
+Success("rzprivate", "Evade script loaded successfully with " .. 
        "Auto | Teleport | Visual | Movement | Misc | Server", 3)
